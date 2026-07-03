@@ -11,7 +11,7 @@ app.use(cors({ origin: '*' }));
 app.use(express.static(path.join(__dirname, '..', 'Fronted')));
 
 // MongoDB connection
-const uri = "mongodb+srv://hellokaiiddo:0Mgb6Peq3UlsNpCD@cluster0.azbh81j.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const uri = process.env.MONGO_URI;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -22,6 +22,7 @@ const client = new MongoClient(uri, {
 
 let db;
 let activeBots = {}; // Track active bot instances
+let busyBots = new Set(); 
 let propertiesCollection; // For storing properties
 
 async function connectToMongo() {
@@ -45,38 +46,53 @@ async function connectToMongo() {
 }
 
 async function launchBot(botId) {
-  const botCfg = await botsCollection.findOne({ botId });
-  if (!botCfg) return false;
+  if (busyBots.has(botId)) return false; 
+  busyBots.add(botId);
+  try {
+    const botCfg = await botsCollection.findOne({ botId });
+    if (!botCfg) return false;
 
-  // Stop any existing instance
-  if (activeBots[botId]) {
-    try {
-      await activeBots[botId].stop('SIGTERM');
-    } catch (_) {}
-    delete activeBots[botId];
+    if (activeBots[botId]) {
+      try {
+        await activeBots[botId].stop('SIGTERM');
+      } catch (_) {}
+      delete activeBots[botId];
+    }
+
+    const instance = new Telegraf(botCfg.token, {
+      telegram: { timeout: 3000 },
+      handlerTimeout: 9000
+    });
+
+    await registerHandlers(instance, botId);
+    instance.launch({ polling: { timeout: 3 } }).catch(async (err) => {
+      console.error(`Bot ${botId} launch error:`, err.message);
+      await botsCollection.updateOne({ botId }, { $set: { status: 'STOP' } });
+      delete activeBots[botId];
+    });
+    activeBots[botId] = instance;
+    await botsCollection.updateOne({ botId }, { $set: { status: 'RUN' } });
+    return true;
+  } finally {
+    busyBots.delete(botId);
   }
-
-  const instance = new Telegraf(botCfg.token, {
-    telegram: { timeout: 3000 },
-    handlerTimeout: 9000
-  });
-
-  await registerHandlers(instance, botId);
-  instance.launch({ polling: { timeout: 3 } });
-  activeBots[botId] = instance;
-  await botsCollection.updateOne({ botId }, { $set: { status: 'RUN' } });
-  return true;
 }
 
 async function stopBot(botId) {
-  if (activeBots[botId]) {
-    try {
-      await activeBots[botId].stop('SIGTERM');
-    } catch (_) {}
-    delete activeBots[botId];
+  if (busyBots.has(botId)) return false; 
+  busyBots.add(botId);
+  try {
+    if (activeBots[botId]) {
+      try {
+        await activeBots[botId].stop('SIGTERM');
+      } catch (_) {}
+      delete activeBots[botId];
+    }
+    await botsCollection.updateOne({ botId }, { $set: { status: 'STOP' } });
+    return true;
+  } finally {
+    busyBots.delete(botId);
   }
-  await botsCollection.updateOne({ botId }, { $set: { status: 'STOP' } });
-  return true;
 }
 
 async function registerHandlers(instance, botId) {

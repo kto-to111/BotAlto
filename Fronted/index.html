@@ -163,7 +163,7 @@ async function loadBots() {
             <span class="badge ${b.status==='RUN'?'bg-success':'bg-secondary'}">${b.status}</span>
           </div>
           <div class="card-body">
-            <button class="btn btn-sm ${b.status==='RUN'?'btn-warning':'btn-success'} me-1" onclick="toggleBot('${b.botId}')">
+            <button class="btn btn-sm ${b.status==='RUN'?'btn-warning':'btn-success'} me-1" onclick="toggleBot('${b.botId}, this')">
               <i data-lucide="${b.status==='RUN'?'power-off':'play'}" class="me-1"></i>${b.status==='RUN'?'Stop':'Start'}
             </button>
             <button class="btn btn-sm btn-outline-info me-1" onclick="openCommands('${b.botId}','${b.name}')">
@@ -204,20 +204,26 @@ async function createBot() {
     showToast('Error creating bot');
   }
 }
+let togglingBots = new Set(); // botId, для которых сейчас идёт запрос
 
-async function toggleBot(id) {
+async function toggleBot(id, btnEl) {
+  if (togglingBots.has(id)) return; // уже в процессе — игнорируем клик
+  togglingBots.add(id);
+  if (btnEl) btnEl.disabled = true;
+
   try {
     const bot = await fetch('/getBots').then(r=>r.json()).then(l=>l.find(b=>b.botId===id));
     const url = bot.status==='RUN'?'/stopBot':'/startBot';
     await api(url, {botId: id});
     showToast(`Bot ${bot.status==='RUN'?'stopped':'started'} successfully`);
-    loadBots();
+    await loadBots();
   } catch (error) {
     console.error('Error toggling bot:', error);
     showToast('Error toggling bot');
+  } finally {
+    togglingBots.delete(id);
   }
 }
-
 async function deleteBot(id) {
   if (!confirm('Are you sure you want to delete this bot?')) return;
   
