@@ -1,12 +1,24 @@
 #!/bin/bash
-set -e  # остановить скрипт при любой ошибке
+set -e
+
+# Определяем, нужен ли sudo
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+else
+  if command -v sudo &> /dev/null; then
+    SUDO="sudo"
+  else
+    echo "Ошибка: скрипт запущен не от root, и sudo не установлен."
+    exit 1
+  fi
+fi
 
 echo "=== BotAlto Deploy Script (Debian 12) ==="
 
 # --- 1. Обновление системы и установка базовых зависимостей ---
 echo "Обновляю пакеты и ставлю базовые зависимости..."
-sudo apt-get update
-sudo apt-get install -y curl git ca-certificates gnupg
+$SUDO apt-get update
+$SUDO apt-get install -y curl git ca-certificates gnupg
 
 # --- 2. Установка Node.js 20.x (NodeSource) ---
 if ! command -v node &> /dev/null; then
@@ -79,7 +91,7 @@ fi
 # --- 6. Установка pm2 для автозапуска и авто-рестарта ---
 if ! command -v pm2 &> /dev/null; then
   echo "Устанавливаю pm2..."
-  sudo npm install -g pm2
+  $SUDO npm install -g pm2
 else
   echo "pm2 уже установлен: $(pm2 -v)"
 fi
