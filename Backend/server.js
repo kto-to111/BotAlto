@@ -11,7 +11,7 @@ app.use(cors({ origin: '*' }));
 app.use(express.static(path.join(__dirname, '..', 'Fronted')));
 
 // MongoDB connection
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
