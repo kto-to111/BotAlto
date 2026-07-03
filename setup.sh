@@ -22,18 +22,16 @@ $SUDO apt-get install -y curl git ca-certificates gnupg
 
 # --- 2. Install Node.js 20.x (NodeSource) ---
 if ! command -v node &> /dev/null; then
-  echo "Installing Node.js via nvm..."
+  echo "Installing Node.js..."
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
-  \. "$NVM_DIR/nvm.sh"
+  \. "$HOME/.nvm/nvm.sh"
   nvm install 24
 else
   echo "Node.js already installed: $(node -v)"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
 echo "Node version: $(node -v)"
 echo "npm version: $(npm -v)"
-
 
 # --- 3. Clone your forked repository ---
 REPO_URL="https://github.com/kto-to111/BotAlto.git"
@@ -52,6 +50,11 @@ fi
 # --- 4. Install project dependencies ---
 echo "Installing npm dependencies..."
 npm install
+
+if [ ! -d "node_modules/mongodb" ]; then
+  echo "mongodb module missing, installing explicitly..."
+  npm install mongodb
+fi
 
 # --- 5. Create .env and prompt for MONGODB_URI ---
 ENV_FILE="$INSTALL_DIR/.env"
@@ -106,8 +109,12 @@ pm2 save
 
 # --- 8. Configure pm2 to start on boot ---
 echo "Configuring pm2 startup on boot..."
-STARTUP_CMD=$(pm2 startup systemd -u "$USER" --hp "$HOME" | tail -n 1)
-eval "$STARTUP_CMD"
+STARTUP_CMD=$(pm2 startup systemd -u "$USER" --hp "$HOME" | grep -E '^(sudo|env)')
+if [ -n "$STARTUP_CMD" ]; then
+  eval "$STARTUP_CMD"
+else
+  echo "pm2 startup already configured, skipping."
+fi
 
 echo ""
 echo "=== Done! ==="
