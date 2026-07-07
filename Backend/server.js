@@ -105,6 +105,7 @@ async function registerHandlers(instance, botId) {
   const botCommands = await commandsCollection.findOne({ botId });
   if (botCommands && botCommands.commands) {
     for (const cmd in botCommands.commands) {
+      if (cmd.startsWith('callback:')) continue;
       const raw = cmd.replace('/', '');
       instance.command(raw, async (ctx) => {
         try {
@@ -116,6 +117,23 @@ async function registerHandlers(instance, botId) {
       });
     }
   }
+
+  instance.on('callback_query', async (ctx) => {
+    const data = ctx.callbackQuery.data; 
+    const botCommands = await commandsCollection.findOne({ botId });
+    const code = botCommands?.commands?.[`callback:${data}`];
+
+    if (code) {
+      try {
+        new Function('ctx', code)(ctx);
+      } catch (e) {
+        ctx.answerCbQuery('Ошибка выполнения');
+        await storeError(botId, e.message, `callback:${data}`);
+      }
+    } else {
+      await ctx.answerCbQuery();
+    }
+  });
 }
 
 async function storeError(botId, errorMessage, command) {
