@@ -163,7 +163,7 @@ async function loadBots() {
             <span class="badge ${b.status==='RUN'?'bg-success':'bg-secondary'}">${b.status}</span>
           </div>
           <div class="card-body">
-            <button class="btn btn-sm ${b.status==='RUN'?'btn-warning':'btn-success'} me-1" onclick="toggleBot('${b.botId}, this')">
+            <button class="btn btn-sm ${b.status==='RUN'?'btn-warning':'btn-success'} me-1" onclick="toggleBot('${b.botId}', this)">
               <i data-lucide="${b.status==='RUN'?'power-off':'play'}" class="me-1"></i>${b.status==='RUN'?'Stop':'Start'}
             </button>
             <button class="btn btn-sm btn-outline-info me-1" onclick="openCommands('${b.botId}','${b.name}')">
