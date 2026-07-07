@@ -287,7 +287,7 @@ async function loadCommands() {
           <div class="card-header d-flex justify-content-between">
             <span>/${name}</span>
             <div>
-              <button class="btn btn-sm btn-outline-secondary" onclick="editCmd('${name}',\`${escapeHtml(code)}\`)">
+              <button class="btn btn-sm btn-outline-secondary edit-cmd-btn" data-name="${escapeHtml(name)}">
                 <i data-lucide="edit-2" class="me-1"></i>Edit
               </button>
               <button class="btn btn-sm btn-outline-danger ms-1" onclick="delCmd('${name}')">
@@ -299,6 +299,9 @@ async function loadCommands() {
             <pre class="small bg-light p-2 rounded" style="max-height:120px;overflow:auto">${escapeHtml(code)}</pre>
           </div>
         </div>`;
+        
+      col.querySelector('.edit-cmd-btn').addEventListener('click', () => editCmd(name, code));
+
       grid.appendChild(col);
     });
     lucide.createIcons();

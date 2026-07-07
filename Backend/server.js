@@ -24,6 +24,9 @@ let db;
 let activeBots = {}; // Track active bot instances
 let busyBots = new Set(); 
 let propertiesCollection; // For storing properties
+let botsCollection;
+let commandsCollection;
+let errorsCollection;
 
 async function connectToMongo() {
   try {
