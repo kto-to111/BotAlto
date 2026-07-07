@@ -90,8 +90,18 @@
       </div>
       <div class="card-body">
         <div class="mb-3">
-          <label class="form-label">Command name (without /)</label>
-          <input id="cmdName" class="form-control">
+          <label class="form-label d-block">Type</label>
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="cmdType" id="typeCommand" checked onchange="onTypeChange()">
+            <label class="btn btn-outline-primary btn-sm" for="typeCommand">Command (/name)</label>
+
+            <input type="radio" class="btn-check" name="cmdType" id="typeCallback" onchange="onTypeChange()">
+            <label class="btn btn-outline-primary btn-sm" for="typeCallback">Callback button</label>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" id="cmdNameLabel">Command name (without /)</label>
+          <input id="cmdName" class="form-control" placeholder="start">
         </div>
         <div class="mb-3">
           <label class="form-label">Command code</label>
@@ -125,6 +135,19 @@ let editingCommand = null;
 
 // API helper
 const api = (p,d) => fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json());
+
+function onTypeChange() {
+  const isCallback = document.getElementById('typeCallback').checked;
+  const label = document.getElementById('cmdNameLabel');
+  const input = document.getElementById('cmdName');
+  if (isCallback) {
+    label.innerText = 'Callback data (value from callback_data)';
+    input.placeholder = 'about';
+  } else {
+    label.innerText = 'Command name (without /)';
+    input.placeholder = 'start';
+  }
+}
 
 /* ---------- Toast Notifications ---------- */
 function showToast(message) {
@@ -280,17 +303,23 @@ async function loadCommands() {
     }
 
     Object.entries(cmds).forEach(([name, code]) => {
+      const isCallback = name.startsWith('callback:');
+      const displayName = isCallback ? name.replace('callback:', '') : `/${name}`;
+      const badge = isCallback
+        ? `<span class="badge bg-info text-dark me-1">callback</span>`
+        : `<span class="badge bg-primary me-1">command</span>`;
+
       const col = document.createElement('div');
       col.className = 'col-12 col-md-6 col-lg-4';
       col.innerHTML = `
         <div class="card">
-          <div class="card-header d-flex justify-content-between">
-            <span>/${name}</span>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>${badge}${displayName}</span>
             <div>
-              <button class="btn btn-sm btn-outline-secondary edit-cmd-btn" data-name="${escapeHtml(name)}">
+              <button class="btn btn-sm btn-outline-secondary edit-cmd-btn">
                 <i data-lucide="edit-2" class="me-1"></i>Edit
               </button>
-              <button class="btn btn-sm btn-outline-danger ms-1" onclick="delCmd('${name}')">
+              <button class="btn btn-sm btn-outline-danger ms-1 del-cmd-btn">
                 <i data-lucide="trash-2" class="me-1"></i>Delete
               </button>
             </div>
@@ -299,8 +328,9 @@ async function loadCommands() {
             <pre class="small bg-light p-2 rounded" style="max-height:120px;overflow:auto">${escapeHtml(code)}</pre>
           </div>
         </div>`;
-        
+
       col.querySelector('.edit-cmd-btn').addEventListener('click', () => editCmd(name, code));
+      col.querySelector('.del-cmd-btn').addEventListener('click', () => delCmd(name));
 
       grid.appendChild(col);
     });
@@ -322,12 +352,15 @@ function escapeHtml(unsafe) {
 
 function editCmd(name, code) {
   editingCommand = name;
-  document.getElementById('cmdName').value = name;
+  const isCallback = name.startsWith('callback:');
+  document.getElementById('cmdName').value = isCallback ? name.replace('callback:', '') : name;
   document.getElementById('cmdCode').value = code;
-  document.getElementById('editSectionTitle').innerText = `Edit Command /${name}`;
+  document.getElementById('typeCallback').checked = isCallback;
+  document.getElementById('typeCommand').checked = !isCallback;
+  onTypeChange();
+  document.getElementById('editSectionTitle').innerText = `Edit ${isCallback ? 'Callback' : 'Command'} ${isCallback ? name.replace('callback:','') : '/' + name}`;
   document.getElementById('cancelEditBtn').style.display = 'block';
-  
-  // Scroll to edit section
+
   document.getElementById('commandEditSection').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -340,33 +373,33 @@ function cancelEdit() {
 }
 
 async function saveCommand() {
-  const name = document.getElementById('cmdName').value.trim();
+  const rawName = document.getElementById('cmdName').value.trim();
   const code = document.getElementById('cmdCode').value.trim();
-  
-  if (!name || !code) {
+  const isCallback = document.getElementById('typeCallback').checked;
+
+  if (!rawName || !code) {
     showToast('Please fill both fields');
     return;
   }
 
+  const name = isCallback ? `callback:${rawName.replace(/^callback:/, '')}` : rawName;
+
   try {
     if (editingCommand) {
-      // If editing existing command, we might need to delete old one first if name changed
       if (name !== editingCommand) {
         await api('/delCommand', {botId: currentBotId, name: editingCommand});
       }
     }
-    
+
     await api('/addCommand', {botId: currentBotId, name, code});
-    showToast(`Command /${name} ${editingCommand ? 'updated' : 'added'} successfully`);
-    
-    // Reset form
+    showToast(`Command ${isCallback ? name : '/' + name} ${editingCommand ? 'updated' : 'added'} successfully`);
+
     document.getElementById('cmdName').value = '';
     document.getElementById('cmdCode').value = '';
     document.getElementById('editSectionTitle').innerText = 'Add New Command';
     document.getElementById('cancelEditBtn').style.display = 'none';
     editingCommand = null;
-    
-    // Refresh command list
+
     await loadCommands();
   } catch (error) {
     console.error('Error saving command:', error);
